@@ -1,7 +1,7 @@
 # aptos-firebase-event-capture
 Some demo code to show how to capture any Aptos event handle, write each event to a Firestore collection, then trigger a cloud function with each event written to the collection.
 
-Aptos events are low cost/gas methods of letting the off chain world know whats going on in your module. Once the events are emitted, we've got to have a way to read and then act on those events. The Aptos Indexer can grab this data, but we find this code more approachable and definitely more surgical/precise. Plus, we can rely on Google Cloud's infrastructure horsepower processing these events rather than trying to run a singular Indexer on a server somewhere.
+Aptos events are low cost/gas methods of letting the off chain world know what's going on in your module. Once the events are emitted, we've got to have a way to read and then act on those events. The Aptos Indexer can grab this data, but we find this code more approachable and definitely more surgical/precise. Plus, we can rely on Google Cloud's infrastructure horsepower processing these events rather than trying to run a singular Indexer on a server somewhere.
 
 The root of the capability is in events.ts with this function:
 ```
@@ -39,5 +39,12 @@ Within `stores`, we have a sub collection for each event handle captured, and th
 We call this function from a PubSub scheduled function that we run every 5 minutes.  That's really a business logic decision where you need to balance the latency between event emission and capture vs the number of times you're calling this function. If you're calling every minute, that's 3,600 calls a day or 1.3 million calls per year. That's going to run you all of $0.51 in Google Cloud fees - so you're probably ok running it often!
 
 The other Firebase function is the Firestore onCreate event:
+```
+exports.processEvents = document("events/stores/{eventHandle}/{documentId}").onCreate((event)
+```
+We've set this up with wild cards. Whenever a new event is written to Firestore, this function is called.  The value of `eventHandle` will pass our `[account]_[handle_struct].[handle_field]` naming convention identify the event handle it came from.  The `documentId` will contain the guid+sequence number identifier from the event, and `event` will contain the event data.
+One final note is a bit of architecture on where to hold event handles. For our purposes, most of our event handles are stored at the module level. As events are pruned from the ledger over time, we don't see advantages to individual user accounts holding separate event handles. We create our event handles in a struct stored in the resource account that runs our module. This greatly simplifies the number of event handles we need to capture and act on.
 
-. We've set this up with wild cards. Whenever a new event is written to Firestore, this function is called.  The value of 
+We'll do some updates to this.  The writes should really be done in batches, which would greatly speed this up. We'll add that soon. Feel free to submit issues/featuers/PRs to the repo as you see fit.
+
+Team Nutrios
